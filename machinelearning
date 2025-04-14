@@ -1,0 +1,48 @@
+import streamlit as st
+import pandas as pd
+import string
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+# Step 1: Load and preprocess dataset internally
+@st.cache_resource
+def train_model():
+    df = pd.read_csv("real_fake news.csv")
+    df['clean_text'] = df['Text'].apply(lambda text: str(text).lower().translate(str.maketrans('', '', string.punctuation)))
+    # TF-IDF Vectorizer with n-grams
+    tfidf = TfidfVectorizer(ngram_range=(1,2), max_features=3000, stop_words='english')
+    X = tfidf.fit_transform(df['clean_text'])
+    y = df['label'].map({'Fake': 0, 'Real': 1})
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Improved Model - Random Forest Classifier
+    model = RandomForestClassifier(n_estimators=200, max_depth=50, random_state=42)
+    model.fit(X_train, y_train)
+    acc = accuracy_score(y_test, model.predict(X_test))
+    report = classification_report(y_test, model.predict(X_test))
+    return model, tfidf, acc, report
+# Train model
+model, vectorizer, accuracy, report = train_model()
+# Streamlit UI
+st.set_page_config(page_title="Fake News Detector")
+st.title("📰 Fake News Detection using ML.")
+st.markdown("<h4 style='color:black;'>Check if your news is <span style='color:green;'>REAL</span> or <span style='color:red;'>FAKE</span> ! </h4>", unsafe_allow_html=True)
+# User input
+st.markdown("### ✍️ Enter your news article:")
+input_text = st.text_area(" ")
+# Predict
+if st.button("Predict"):
+    if input_text.strip() == "":
+        st.warning("⚠️ Please enter some text first!")
+    else:
+        clean_input = input_text.lower().translate(str.maketrans('', '', string.punctuation))
+        input_vector = vectorizer.transform([clean_input])
+        result = model.predict(input_vector)[0]
+        if result == 1:
+            st.success("🟢 This news is REAL!")
+        else:
+            st.error("🔴 This news is FAKE!")
+        st.markdown(f"📈 Model Accuracy:** {round(accuracy * 100, 2)}%")
+# Footer
+st.markdown("---")
+st.markdown("<h5 style='text-align:center;'>Mini Project using Streamlit and Random Forest.</h5>", unsafe_allow_html=True)
